@@ -1,29 +1,11 @@
-import mysql.connector
-
-from store_state import store_state
-from server.custom_classes import *
+from server.models.cart import Cart
+from server.models.visitor import Visitor
 
 
-if __name__ == "__main__":
-    # connect to database
-    conn = mysql.connector.connect(
-        host = "",
-        user = "",
-        password = "",
-        database=""
-    )
-
-    # initialize
-    visitors = {}
-    fruits = {}
-    available_carts = set(range(1,5))
-    using_carts = set()
-
-    cursor = conn.cursor()
-    cursor.execute("select fruit_id, stock from fruit")
-    for fruit_id, stock in cursor.fetchall():
-        fruits[fruit_id] = stock
-
+"""
+DB에 따라 현재 매장 내에 있는 visitor들을 초기화한다.
+"""
+def sync_db_to_visitor(cursor, visitors, using_carts, available_carts):
     cursor.execute("""
         SELECT  m.member_name, vi.member_id, vi.visit_id, c.cart_id, c.purchased, c.cart_cam, cf.fruit_id, cf.quantity, f.fruit_name, f.price
         FROM 
@@ -57,6 +39,4 @@ if __name__ == "__main__":
 
     available_carts -= using_carts
 
-    for v in visitors.values():
-        logger.info(v)
 
