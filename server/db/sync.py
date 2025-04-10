@@ -1,42 +1,57 @@
 from server.models.cart import Cart
 from server.models.visitor import Visitor
+from server.store_state import store_state
 
 
 """
-DB에 따라 현재 매장 내에 있는 visitor들을 초기화한다.
+store_state.visitors를 DB와 연동한다.
 """
-def sync_db_to_visitor(cursor, visitors, using_carts, available_carts):
+def sync_visitors_to_db(cursor):
+    """현재 매장에 체류중인 고객의 정보를 가져온다."""
     cursor.execute("""
-        SELECT  m.member_name, vi.member_id, vi.visit_id, c.cart_id, c.purchased, c.cart_cam, cf.fruit_id, cf.quantity, f.fruit_name, f.price
-        FROM 
-            members m
-        LEFT JOIN 
-            visit_info vi ON m.member_id = vi.member_id
-        LEFT JOIN 
-            cart c ON vi.visit_id = c.visit_id
-        LEFT JOIN 
-            cart_fruit cf ON c.cart_id = cf.cart_id
-        LEFT JOIN 
-            fruit f ON cf.fruit_id = f.fruit_id
-        WHERE 
-            vi.out_dttm IS NULL;
-    """)
-
+                   SELECT m.member_name, vi.member_id, vi.visit_id 
+                   FROM visit_info vi
+                   JOIN members m ON m.member_id = vi.member_id
+                   WHERE vi.out_dttm IS NULL;
+                   """)
+    
     data = cursor.fetchall()
     for row in data:
-        member_name, member_id, visit_id, cart_id, purchase, cart_cam, fruit_id, quantity, fruit_name, price = row
-        if visit_id not in visitors:
-            if cart_id and cart_cam:
-                c = Cart(cart_id, cart_cam)
-                c.purchase = purchase
-                using_carts.add(cart_cam)
-            else:
-                Cart(None, None)
-            v = Visitor(visit_id, member_id, member_name, c)
-            visitors[visit_id] = v
-        if fruit_id:
-            visitors[visit_id].cart.data[fruit_id] = [fruit_name, quantity, price]
+        member_name, member_id, visit_id = row
+        """현재 매장에 체류중인 고객의 카트 정보를 가져온다."""
+        cursor.execute("SELECT cart_id, cart_cam, purchased FROM cart WHERE visit_id = %s", (visit_id,))
+        cart_data = cursor.fetchone()
+        cart_id, cart_cam, purchased = cart_data
+        c = Cart(cart_id, cart_cam)
+        store_state.using_carts.add(cart_cam)
+        store_state.available_carts.difference_update(store_state.using_carts)
+        c.purchase = purchased
 
-    available_carts -= using_carts
+        """현재 매장에 체류중인 고객의 카트에 담긴 과일 정보를 가져온다."""
+        cursor.execute("""
+                        SELECT cf.fruit_id, cf.quantity, f.fruit_name, f.price
+                        FROM cart_fruit cf 
+                        JOIN fruit f ON cf.fruit_id = f.fruit_id
+                        WHERE cf.cart_id = %s;
+                        """, (cart_id,))
+        cart_fruits = cursor.fetchall()
+        if not cart_data:
+            continue
+        else:
+            for fruit in cart_fruits:
+                fruit_id, quantity, fruit_name, price = fruit
+                c.fruits[fruit_id] = [fruit_name, quantity, price]
 
+        v = Visitor(visit_id, member_id, member_name, c)
+        store_state.visitors[member_id] = v
 
+"""
+store_state.fruits를 DB와 연동한다.
+"""
+def sync_fruits_to_db(cursor):
+    """과일 정보를 DB에서 가져온다."""
+    cursor.execute("SELECT fruit_id, fruit_name, price, stock FROM fruit")
+    data = cursor.fetchall()
+    for row in data:
+        fruit_id, fruit_name, price, stock = row
+        store_state.fruits[fruit_id] = [fruit_name, price, stock]

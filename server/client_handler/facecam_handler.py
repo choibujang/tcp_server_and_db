@@ -14,10 +14,10 @@ class FacecamHandler:
 
         visitor = store_state.is_visitor_in_store(member_id)
 
-        """
-        방문한 손님의 경우 DB에 방문 정보를 저장하고 카트를 할당한다.
-        """
-        if not visitor:
+        if not visitor:    
+            """
+            방문한 손님의 경우 DB에 방문 정보를 저장하고 카트를 할당한다.
+            """
             conn = get_connection()
             cursor = conn.cursor()
 
@@ -51,8 +51,8 @@ class FacecamHandler:
             """
             res = []
             if visitor.cart.purchase == 0:
-                for fruit in visitor.cart.fruits:
-                    res.append({"Item": fruit.fruit_name, "Count": fruit.stock, "Price": fruit.price})
+                for fruit_id, (name, quantity, price) in visitor.cart.fruits.items():
+                    res.append({"Item": name, "Count": quantity, "Price": price})
             
             self.socket.write(res)
 

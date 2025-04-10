@@ -7,7 +7,7 @@ class StoreState:
     def __init__(self):
         self.visitors = {}  # {member_id: Visitor}
         self.visitor_lock = threading.Lock()
-        self.fruits = []
+        self.fruits = {}  # {fruit_id: [fruit_name, price, stock]}
         self.available_carts = set(range(1, 5))
         self.using_carts = set()
         self.cart_lock = threading.Lock()

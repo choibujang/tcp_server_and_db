@@ -2,7 +2,7 @@ class Cart:
     def __init__(self, cart_id, cart_cam):
         self.cart_id = cart_id
         self.cart_cam = cart_cam
-        self.fruits = []
+        self.fruits = {}  # {fruit_id: [fruit_name, quantity, price]}
         self.purchase = 0
 
     def update(self, new_data):

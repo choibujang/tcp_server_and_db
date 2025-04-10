@@ -1,6 +1,7 @@
 from PyQt5.QtCore import QThread
 from PyQt5.QtNetwork import QTcpSocket
 import json
+from server.client_handler.facecam_handler import FacecamHandler
 
 class ClientThread(QThread):
     def __init__(self, socket: QTcpSocket):
