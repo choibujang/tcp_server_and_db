@@ -4,6 +4,14 @@ from models.cart import Cart
 from models.visitor import Visitor
 
 class FacecamHandler:
+    """
+    Face camera로부터의 요청을 처리하는 핸들러.
+    방문, 결제 요청, 퇴장 이벤트를 감지하고 도메인 객체 및 시스템 상태를 제어한다.
+
+    - 이벤트 처리 로직은 Visitor 객체가 책임진다.
+    - store_state는 리소스(장바구니, 방문자)를 관리한다.
+    - 이 핸들러는 흐름만 조율한다.
+    """
     def __init__(self, socket):
         self.socket = socket
 
@@ -16,69 +24,57 @@ class FacecamHandler:
 
         if not visitor:    
             """
-            방문한 손님의 경우 DB에 방문 정보를 저장하고 카트를 할당한다.
+            방문 이벤트:
+            - 고객은 반드시 카트를 가지므로 먼저 cart_cam을 할당
+            - Visitor 객체와 새로운 DB row를 생성한다
+            - 생성 실패 시, 카트는 반환하고 에러 응답
             """
-            conn = get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute(
-                "INSERT INTO visit_info (member_id, in_dttm) VALUES (%s, NOW())",
-                (member_id,)
-            )
-            cursor.execute("SELECT LAST_INSERT_ID()")
-            visit_id = cursor.fetchone()[0]
-            conn.commit()
-
-            cursor.execute("select member_name from members where member_id=%s", (member_id,))
-            member_name = cursor.fetchone()[0]
-
             cart_cam = store_state.allocate_cart()
+            try:
+                visitor = Visitor.enter_store(member_id, cart_cam)
+                store_state.add_visitor(member_id, visitor)
+            except Exception as e:
+                store_state.release_cart_cam(cart_cam)
+                print(f"failed to enter: {e}: release cart")
+                self.socket.write({"error": "failed to enter"})
 
-            cursor.execute("insert into cart (visit_id, cart_cam, purchased) values (%s, %s, %s)", (visit_id, cart_cam, 0))
-            cart_id = cursor.execute("SELECT LAST_INSERT_ID()")
-            conn.commit()
-
-            c = Cart(cart_id=cart_id, cart_cam=cart_cam)
-            v = Visitor(visit_id, member_id, member_name, c)
-
-            store_state.visitors.add_visitor(member_id, v)
-            
-            cursor.close()
-            conn.close()
         else:
-            """
-            고객이 쇼핑을 마치고 계산하려는 경우 카트에 담긴 물품의 이름, 개수, 가격을 반환해준다.
-            """
             res = []
-            if visitor.cart.purchase == 0:
-                for fruit_id, (name, quantity, price) in visitor.cart.fruits.items():
-                    res.append({"Item": name, "Count": quantity, "Price": price})
+            try:
+                """
+                결제 요청 이벤트:
+                - 장바구니에 담긴 물품을 확인시켜준다.
+                - 구매 확인을 기다리는 상태로 상태 업데이트 (purchased = 1)
+                """
+                if visitor.get_purchased() == 0:
+
+                    for fruit_id, fruit in visitor.get_cart_fruits():
+                        res.append({"Item": fruit.name, "Count": fruit.stock, "Price": fruit.price})
+                    
+                    visitor.update_purchased_state()
+
+                elif visitor.get_purchased() == 1:
+                    """
+                    구매 확인 이벤트:
+                    - action == "yes" → 결제 확정 및 퇴장 처리
+                    - action == "no" → 결제 요청 전 상태로 변경 (purchased = 0)
+                    """
+                    if action == "yes":
+                        visitor.exit_store()
+
+                        store_state.release_cart_cam(visitor.cart_cam)
+                        store_state.remove_visitor(visitor.member_id)
+                    else:
+                        visitor.set_purchased(0)
+                        res.append({"Item": "cancel"})
             
-            self.socket.write(res)
-
-            visitor.cart.purchase = 1
-
-            conn = get_connection()
-            cursor = conn.cursor()
-            cursor.execute("update cart set purchased=1 where cart_id=%s", (visitor.cart.cart_id,))
-            conn.commit()
-            cursor.close()
-            conn.close()
-
-            """
-            고객이 장바구니에 담은 물품 정보를 확인하고 결제하려는 경우, 결제 정보를 DB에 업데이트하고 고객 객체를 삭제한다.
-            """
-            if visitor.cart.purchase == 1:
-                if action == "yes":
-                    conn = get_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("update cart set purchased=%s, pur_dttm=NOW() where cart_id=%s", (2, visitor.cart.cart_id))
-                    cursor.execute("update visit_info set out_dttm=NOW() where visit_id=%s", (visitor.visit_id,))
-                    conn.commit()
-                    conn.close()
-                    cursor.close()
-
-                    store_state.remove_visitor(visitor.member_id)
+            except Exception as e:
+                print(f"Error occured: {e}")
+                res.clear()
+                res.append({"Item": "error"})
+            finally:
+                self.socket.write(res)
+            
 
 
                 
