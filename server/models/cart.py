@@ -1,7 +1,7 @@
 from server.models.fruit import Fruit
 """
-장바구니 객체.
-물품 업데이트 이벤트를 처리한다.
+Cart:
+- 하나의 장바구니 객체로 고객이 담은 과일 정보와 결제 상태를 관리한다.
 """
 class Cart:
     def __init__(self, cart_id, cart_cam):

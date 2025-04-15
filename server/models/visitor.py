@@ -1,12 +1,17 @@
+"""
+Visitor:
+- 고객 한 명의 방문 상태를 표현하는 도메인 객체.
+- 입장, 결제 요청, 퇴장 상태를 관리한다.
+
+- 핸들러들은 Visitor 객체를 통해 처리 로직을 호출한다.
+- DB 연동은 repository를 통해 처리한다.
+"""
+
 from server.db.repository import (insert_visitor_and_cart, 
                                   update_cart_purchased,
                                   update_visitor_cart_on_exit)
 from server.models.cart import Cart
 
-"""
-방문자 객체.
-입장, 결제요청, 퇴장 이벤트에 따른 객체 상태 변화와 DB 반영을 책임진다.
-"""
 class Visitor:
     def __init__(self, visit_id, member_id, member_name, cart):
         self.visit_id = visit_id    # visit_info 테이블의 PK

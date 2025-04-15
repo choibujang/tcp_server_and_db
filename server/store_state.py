@@ -1,3 +1,12 @@
+"""
+store_state:
+- 시스템 전역의 방문자 상태와 장바구니 자원(cart_cam)을 관리한다.
+- Visitor나 Cart 객체는 직접 store_state에 접근하지 않으며,
+  외부 handler가 이를 통해 자원을 할당/회수/조회한다.
+
+- 장바구니(cam)는 개수 제한이 있으므로, 재할당 가능한 구조로 구현한다.
+"""
+
 import threading
 from models.visitor import Visitor
 from models.cart import Cart

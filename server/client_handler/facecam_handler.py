@@ -1,17 +1,17 @@
+"""
+FacecamHandler:
+- Face camera로부터의 요청을 처리하는 핸들러.
+- 방문, 결제 요청, 퇴장 이벤트를 감지하고 도메인 객체 및 시스템 상태를 제어한다.
+
+- 이벤트 처리 로직은 Visitor 객체가 책임진다.
+- store_state는 리소스(장바구니, 방문자)를 관리한다.
+- 이 핸들러는 흐름만 조율한다.
+"""
+
 from store_state import store_state
-from db.connection import *
-from models.cart import Cart
 from models.visitor import Visitor
 
 class FacecamHandler:
-    """
-    Face camera로부터의 요청을 처리하는 핸들러.
-    방문, 결제 요청, 퇴장 이벤트를 감지하고 도메인 객체 및 시스템 상태를 제어한다.
-
-    - 이벤트 처리 로직은 Visitor 객체가 책임진다.
-    - store_state는 리소스(장바구니, 방문자)를 관리한다.
-    - 이 핸들러는 흐름만 조율한다.
-    """
     def __init__(self, socket):
         self.socket = socket
 
